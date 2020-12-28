@@ -2,8 +2,10 @@ package com.leather.plugindemo;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -12,9 +14,14 @@ import java.lang.reflect.Method;
 
 public class MainActivity extends AppCompatActivity {
 
+    private MyApplication application;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        application = (MyApplication) getApplication();
+//        int identifier = application.getResources().getIdentifier("activity_plugin", "layout", application.getPackageInfo().packageName);
+
         setContentView(R.layout.activity_main);
     }
 
