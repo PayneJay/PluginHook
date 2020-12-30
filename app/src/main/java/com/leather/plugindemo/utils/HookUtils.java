@@ -1,5 +1,6 @@
 package com.leather.plugindemo.utils;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Build;
@@ -11,6 +12,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.leather.plugindemo.ProxyActivity;
+import com.leather.pluginmgr.inter.PluginInterface;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -131,7 +133,7 @@ public class HookUtils {
                 @Override
                 public boolean handleMessage(@NonNull Message msg) {
                     try {
-                        if (msg.what == 159) {
+                        if (msg.what == 159) {//159是activity跳转
                             Object transObj = msg.obj;
                             Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
                             if (!actCallbacksField.isAccessible()) {
@@ -166,8 +168,16 @@ public class HookUtils {
                                 if (targetIntent != null && targetIntent.getComponent() != null) {
                                     //判断下是否是我们之前hook的代理Activity
                                     String className = targetIntent.getComponent().getClassName();
+                                    Log.d(TAG, "hookHandler : " + className);
                                     if (TextUtils.equals(className, "com.leather.plugindemo.ProxyActivity")) {
                                         intentField.set(launchAcItem, targetIntent);
+
+                                        //通过以下将宿主的上下文传给插件，否则插件无法加载资源布局
+                                        Class<?> aClass = Class.forName(className);
+                                        Object obj = aClass.newInstance();
+                                        if (obj instanceof PluginInterface) {
+                                            ((PluginInterface) obj).attachContext((Activity) obj);
+                                        }
                                     }
                                 }
                             }

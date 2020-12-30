@@ -2,21 +2,14 @@ package com.leather.plugin;
 
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
-import android.widget.Toast;
 
-public class PluginActivity extends BaseActivity {
+public class PluginActivity extends BasicActivity {
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_plugin);
 
-        TextView tvContent = findViewById(R.id.tv_content);
-        String string = mContext.getString(R.string.app_name);
-        tvContent.setText(string);
-        Log.e("Jack", getClass().getName() + " onCreate" + string);
-
-        Toast.makeText(mContext, string, Toast.LENGTH_SHORT).show();
+        Log.e("Jack", getClass().getName() + " onCreate");
     }
 }
