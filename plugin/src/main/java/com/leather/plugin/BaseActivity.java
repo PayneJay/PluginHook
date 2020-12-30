@@ -1,7 +1,6 @@
 package com.leather.plugin;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Environment;
@@ -23,6 +22,7 @@ public class BaseActivity extends AppCompatActivity {
         Resources resources = LoadResourceUtils.loadResource(getApplicationContext(),
                 Environment.getExternalStorageDirectory().getPath() + "/plugin-debug.apk");
 
+        Log.e("Jack", getClass().getName() + " onCreate");
         mContext = new ContextThemeWrapper(getBaseContext(), 0);
         Class<? extends Context> aClass = mContext.getClass();
         try {
