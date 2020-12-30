@@ -25,11 +25,11 @@ public class HookUtils {
     public static void hookAMS() {
         try {
             Field enterField;
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {//API 26以后走这个方法
                 Class<?> activityManagerClass = Class.forName("android.app.ActivityManager");
                 //Field IActivityManagerSingleton
                 enterField = activityManagerClass.getDeclaredField("IActivityManagerSingleton");
-            } else {
+            } else {//以前老版本走这个方法
                 Class<?> activityManagerNative = Class.forName("android.app.ActivityManagerNative");
                 enterField = activityManagerNative.getDeclaredField("gDefault");
             }
@@ -37,7 +37,6 @@ public class HookUtils {
             enterField.setAccessible(true);
             //Singleton<IActivityManager>的实例，因为IActivityManagerSingleton是静态的
             Object singletonObject = enterField.get(null);
-
 
             Class<?> singletonClass = Class.forName("android.util.Singleton");
             Field mInstanceField = singletonClass.getDeclaredField("mInstance");
@@ -54,79 +53,13 @@ public class HookUtils {
                     classLoader, new Class[]{iActivityManagerInterface}, new InvocationHandler() {
 
                         @Override
-                        public Object invoke(Object proxy, Method method, Object[] args)
-                                throws Throwable {
+                        public Object invoke(Object proxy, Method method, Object[] objects) throws Throwable {
                             Log.e(TAG, "invoke:   ~~~~~~ " + method.getName());
 
-                            if ("startActivity".equals(method.getName())) {
-                                Log.i(TAG, "准备启动activity");
-                                Intent rawIntent = null;
-                                int index = 0;
-                                for (int i = 0; i < args.length; i++) {
-                                    if (args[i] instanceof Intent) {
-                                        rawIntent = (Intent) args[i];
-                                        index = i;
-                                        break;
-                                    }
-                                }
-
-
-                                // 将需要被启动的Activity替换成StubActivity
-                                Intent newIntent = new Intent();
-                                String stubPackage = "com.leather.plugindemo";
-                                newIntent.setComponent(new ComponentName(stubPackage, ProxyActivity.class.getName()));
-//                              newIntent.setClassName(rawIntent.getComponent().getPackageName(), StubActivity.class.getName());
-                                //把这个newIntent放回到args,达到了一个欺骗AMS的目的
-                                newIntent.putExtra(TARGET_INTENT, rawIntent);
-                                args[index] = newIntent;
-
-                            }
-
-                            return method.invoke(mIActivityManagerObject, args);
-                        }
-                    });
-
-            //把我们的代理对象融入到framework
-            //IActivityManager 在源码中是AIDL
-            mInstanceField.set(singletonObject, mIActivityManagerProxy);
-
-        } catch (Exception e) {
-            Log.e(TAG, "hookIActivityManager: " + e.getMessage());
-            e.printStackTrace();
-
-        }
-
-    }
-
-    public static void hookAMS1() {
-        try {
-            Class<?> iActivityManagerCls = Class.forName("android.app.IActivityTaskManager");
-            Class<?> actManagerCls = Class.forName("android.app.ActivityTaskManager");
-            //通过反射获取ActivityTaskManager中对成员变量IActivityTaskManagerSingleton
-            Field singletonField = actManagerCls.getDeclaredField("IActivityTaskManagerSingleton");
-            if (!singletonField.isAccessible()) {
-                singletonField.setAccessible(true);
-            }
-            //因为IActivityTaskManagerSingleton是个静态变量，所以可以直接反射get得到
-            Object singleObj = singletonField.get(null);
-
-            Class<?> singletonCls = Class.forName("android.util.Singleton");
-            Field instanceField = singletonCls.getDeclaredField("mInstance");
-            if (!instanceField.isAccessible()) {
-                instanceField.setAccessible(true);
-            }
-            final Object instanceObj = instanceField.get(singleObj);
-
-            //动态代理IActivityTaskManager类，hook IActivityTaskManager中的startActivity方法
-            Object proxy = Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{iActivityManagerCls},
-                    new InvocationHandler() {
-                        Intent targetIntent;
-
-                        @Override
-                        public Object invoke(Object o, Method method, Object[] objects) throws Throwable {
                             //这个invoke方法会多次回调，因为IActivityTaskManager接口中不止有一个方法
                             //我们需要判断找到我们要hook的方法做处理，其他方法照常走以前的逻辑
-                            if (TextUtils.equals(method.getName(), "startActivity")) {
+                            if (TextUtils.equals("startActivity", method.getName())) {
+                                Intent targetIntent = null;
                                 int index = 0;
                                 //遍历参数列表，找到我们需要替换的参数，这里也就是intent
                                 for (int i = 0; i < objects.length; i++) {
@@ -137,35 +70,38 @@ public class HookUtils {
                                     }
                                 }
 
-                                //创建我们自己的代理intent，然后把我们的代理Activity设置给这个intent
-                                Intent proxyIntent = new Intent();
-                                proxyIntent.setClassName("com.leather.plugindemo",
-                                        "com.leather.plugindemo.ProxyActivity");
-                                //这里将targetIntent作为参数携带在proxyIntent上，AMS校验完后我们需要将代理Activity
-                                // 替换为我们的目标Activity，才能正常启动目标Activity
-                                proxyIntent.putExtra(TARGET_INTENT, targetIntent);
-
                                 ComponentName component = targetIntent.getComponent();
-                                if (component != null) {
+                                //因为启动的Activity有可能是宿主中的，这种情况我们是不需要做替换的
+                                // 所以这里我们做个判断，如果不是宿主中的，即只有是插件中的才做替换
+                                if (component != null && component.getClassName().contains("com.leather.plugin")) {
+                                    //创建我们自己的代理intent，然后把我们的代理Activity设置给这个intent
+                                    Intent proxyIntent = new Intent();
                                     String packageName = component.getPackageName();
-                                    //因为启动的Activity有可能是宿主中的，这种情况我们是不需要做替换的
-                                    // 所以这里我们做个判断，如果不是宿主中的，即只有是插件中的才做替换
-                                    if (TextUtils.equals(packageName, "com.leather.plugin")) {
-                                        //替换目标参数
-                                        objects[index] = proxyIntent;
-                                    }
+                                    proxyIntent.setComponent(new ComponentName(packageName,
+                                            ProxyActivity.class.getName()));
+                                    //这里将targetIntent作为参数携带在proxyIntent上，AMS校验完后我们需要将代理Activity
+                                    // 替换为我们的目标Activity，才能正常启动目标Activity
+                                    proxyIntent.putExtra(TARGET_INTENT, targetIntent);
+                                    //替换目标参数
+                                    objects[index] = proxyIntent;
                                 }
 
                             }
-                            return method.invoke(instanceObj, objects);
+
+                            return method.invoke(mIActivityManagerObject, objects);
                         }
                     });
-            //利用反射替换掉IActivityTaskManager对象为我们做过改动的对象
-            instanceField.set(instanceObj, proxy);
+
+            //把我们的代理对象融入到framework
+            //IActivityManager 在源码中是AIDL
+            mInstanceField.set(singletonObject, mIActivityManagerProxy);
+
         } catch (Exception e) {
+            Log.e(TAG, "hookIActivityManager: " + e.getMessage());
             e.printStackTrace();
-            Log.d("jack", "hookAMS : " + e.getMessage());
+            Log.d(TAG, "hookAMS : " + e.getMessage());
         }
+
     }
 
     public static void hookHandler() {
@@ -238,7 +174,7 @@ public class HookUtils {
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
-                        Log.d("jack", "handleMessage : " + e.getMessage());
+                        Log.d(TAG, "handleMessage : " + e.getMessage());
                     }
                     return false;
                 }
@@ -246,7 +182,7 @@ public class HookUtils {
 
         } catch (Exception e) {
             e.printStackTrace();
-            Log.d("jack", "hookHandler : " + e.getMessage());
+            Log.d(TAG, "hookHandler : " + e.getMessage());
         }
     }
 }

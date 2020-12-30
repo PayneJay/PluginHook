@@ -19,7 +19,6 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Intent intent = getIntent();
 
         Resources resources = LoadResourceUtils.loadResource(getApplicationContext(),
                 Environment.getExternalStorageDirectory().getPath() + "/plugin-debug.apk");

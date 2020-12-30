@@ -3,6 +3,7 @@ package com.leather.plugin;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.util.Log;
 
 import java.lang.reflect.Method;
 
@@ -27,6 +28,7 @@ public class LoadResourceUtils {
             skinResources = new Resources(assetManager, appResources.getDisplayMetrics(), appResources.getConfiguration());
         } catch (Exception e) {
             e.printStackTrace();
+            Log.d("jack", "loadResource Exception : " + e.getMessage());
         }
 
         return skinResources;

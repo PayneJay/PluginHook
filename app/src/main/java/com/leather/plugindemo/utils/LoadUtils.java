@@ -14,6 +14,8 @@ import dalvik.system.PathClassLoader;
 
 public class LoadUtils {
 
+    private static final String TAG = "Jack";
+
     /******************************************************************************************************
      * 这个方法的目的是将插件中的dexElements[]提取出来，和宿主的dexElements[]进行合并，然后将合并后的新数组重新赋值给
      * 宿主的dexElements[]，这样我们在宿主中就能加载到插件中的类了
@@ -29,7 +31,7 @@ public class LoadUtils {
      * @param context 上下文
      */
     public static void loadClass(Context context, String path) {
-        Log.d("jack", "context : " + context.toString() + ", path : " + path);
+        Log.d(TAG, "context : " + context.toString() + ", path : " + path);
         try {
             //准备工作
             //首先拿到BaseDexClassLoader
@@ -84,7 +86,7 @@ public class LoadUtils {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            Log.d("jack", "loadClass Exception : " + e.getMessage());
+            Log.d(TAG, "loadClass Exception : " + e.getMessage());
         }
     }
 
@@ -108,6 +110,7 @@ public class LoadUtils {
             skinResources = new Resources(assetManager, appResources.getDisplayMetrics(), appResources.getConfiguration());
         } catch (Exception e) {
             e.printStackTrace();
+            Log.d(TAG, "loadResource Exception : " + e.getMessage());
         }
 
         return skinResources;

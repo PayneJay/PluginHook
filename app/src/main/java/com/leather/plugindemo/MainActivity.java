@@ -1,27 +1,20 @@
 package com.leather.plugindemo;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import java.lang.reflect.Method;
 
 public class MainActivity extends AppCompatActivity {
 
-    private MyApplication application;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        application = (MyApplication) getApplication();
-//        int identifier = application.getResources().getIdentifier("activity_plugin", "layout", application.getPackageInfo().packageName);
-
         setContentView(R.layout.activity_main);
     }
 
@@ -40,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
             showToast.invoke(instance, this, "调用插件中类的方法成功！");
         } catch (Exception e) {
             e.printStackTrace();
-            Log.d("jack", "Exception : " + e.getMessage());
+            Log.d("jack", "callPluginMethod Exception : " + e.getMessage());
         }
     }
 
@@ -50,8 +43,9 @@ public class MainActivity extends AppCompatActivity {
             Class<?> pluginClass = classLoader.loadClass("com.leather.plugin.PluginActivity");
             Intent intent = new Intent(this, pluginClass);
             startActivity(intent);
-        } catch (ClassNotFoundException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+            Log.d("jack", "startPluginActivity Exception : " + e.getMessage());
         }
     }
 }
