@@ -1,6 +1,7 @@
 package com.leather.plugindemo.utils;
 
 import android.app.Activity;
+import android.app.Instrumentation;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Build;
@@ -11,6 +12,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.leather.plugindemo.InstrumentationProxy;
 import com.leather.plugindemo.ProxyActivity;
 import com.leather.pluginmgr.inter.PluginInterface;
 
@@ -18,7 +20,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.List;
 
 public class HookUtils {
     public static final String TARGET_INTENT = "target_intent";
@@ -27,6 +28,7 @@ public class HookUtils {
     public static void hookAMS() {
         try {
             Field enterField;
+            LogUtil.i("Build.VERSION.SDK_INT : " + Build.VERSION.SDK_INT);
             if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {//API 26以后走这个方法
                 Class<?> activityManagerClass = Class.forName("android.app.ActivityManager");
                 //Field IActivityManagerSingleton
@@ -56,8 +58,6 @@ public class HookUtils {
 
                         @Override
                         public Object invoke(Object proxy, Method method, Object[] objects) throws Throwable {
-                            Log.e(TAG, "invoke:   ~~~~~~ " + method.getName());
-
                             //这个invoke方法会多次回调，因为IActivityTaskManager接口中不止有一个方法
                             //我们需要判断找到我们要hook的方法做处理，其他方法照常走以前的逻辑
                             if (TextUtils.equals("startActivity", method.getName())) {
@@ -65,6 +65,7 @@ public class HookUtils {
                                 int index = 0;
                                 //遍历参数列表，找到我们需要替换的参数，这里也就是intent
                                 for (int i = 0; i < objects.length; i++) {
+                                    LogUtil.i("hookAMS objects[" + i + "] : " + objects[i].toString());
                                     if (objects[i] instanceof Intent) {
                                         index = i;
                                         targetIntent = (Intent) objects[i];
@@ -101,7 +102,7 @@ public class HookUtils {
         } catch (Exception e) {
             Log.e(TAG, "hookIActivityManager: " + e.getMessage());
             e.printStackTrace();
-            Log.d(TAG, "hookAMS : " + e.getMessage());
+            LogUtil.i("hookAMS : " + e.getMessage());
         }
 
     }
@@ -133,44 +134,47 @@ public class HookUtils {
                 @Override
                 public boolean handleMessage(@NonNull Message msg) {
                     try {
-                        if (msg.what == 159) {//159是activity跳转
+                        LogUtil.i("msg.what : " + msg.what + ",msg.obj : " + msg.obj);
+                        if (msg.what == 100) {//159是activity跳转
                             Object transObj = msg.obj;
-                            Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
-                            if (!actCallbacksField.isAccessible()) {
-                                actCallbacksField.setAccessible(true);
-                            }
-
-                            List<Object> clientTransItems = (List<Object>) actCallbacksField.get(transObj);
-                            Object launchAcItem = null;
-                            if (null == clientTransItems) {
-                                return false;
-                            }
-
-                            //遍历事务集合，找到启动Activity的事务对象
-                            for (Object item : clientTransItems) {
-                                if (item.getClass().getName().contains("android.app.servertransaction.LaunchActivityItem")) {
-                                    launchAcItem = item;
-                                    break;
-                                }
-                            }
-
-                            if (null == launchAcItem) {
-                                return false;
-                            }
+//                            Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
+//                            if (!actCallbacksField.isAccessible()) {
+//                                actCallbacksField.setAccessible(true);
+//                            }
+//
+//                            List<Object> clientTransItems = (List<Object>) actCallbacksField.get(transObj);
+//                            Object launchAcItem = null;
+//                            if (null == clientTransItems) {
+//                                return false;
+//                            }
+//
+//                            //遍历事务集合，找到启动Activity的事务对象
+//                            for (Object item : clientTransItems) {
+//                                if (item.getClass().getName().contains("android.app.servertransaction.LaunchActivityItem")) {
+//                                    launchAcItem = item;
+//                                    break;
+//                                }
+//                            }
+//
+//                            LogUtil.i( "launchAcItem : " + launchAcItem.toString());
+//                            if (null == launchAcItem) {
+//                                return false;
+//                            }
 
                             //反射获取
-                            Field intentField = launchAcItem.getClass().getDeclaredField("mIntent");
+                            Field intentField = transObj.getClass().getDeclaredField("intent");
                             intentField.setAccessible(true);
                             //这个intent就是我们前面hook替换的我们自己的代理intent
-                            Intent proxyIntent = (Intent) intentField.get(launchAcItem);
+                            Intent proxyIntent = (Intent) intentField.get(transObj);
                             if (proxyIntent != null) {
+                                LogUtil.i("hookHandler proxyIntent : " + proxyIntent.getComponent().getClassName());
                                 Intent targetIntent = proxyIntent.getParcelableExtra(TARGET_INTENT);
                                 if (targetIntent != null && targetIntent.getComponent() != null) {
                                     //判断下是否是我们之前hook的代理Activity
                                     String className = targetIntent.getComponent().getClassName();
-                                    Log.d(TAG, "hookHandler : " + className);
-                                    if (TextUtils.equals(className, "com.leather.plugindemo.ProxyActivity")) {
-                                        intentField.set(launchAcItem, targetIntent);
+                                    LogUtil.i("hookHandler targetIntent : " + className);
+                                    if (className.contains("com.leather.plugin.")) {
+                                        intentField.set(transObj, targetIntent);
 
                                         //通过以下将宿主的上下文传给插件，否则插件无法加载资源布局
                                         Class<?> aClass = Class.forName(className);
@@ -184,7 +188,7 @@ public class HookUtils {
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
-                        Log.d(TAG, "handleMessage : " + e.getMessage());
+                        LogUtil.i("handleMessage : " + e.getMessage());
                     }
                     return false;
                 }
@@ -192,7 +196,29 @@ public class HookUtils {
 
         } catch (Exception e) {
             e.printStackTrace();
-            Log.d(TAG, "hookHandler : " + e.getMessage());
+            LogUtil.i("hookHandler : " + e.getMessage());
+        }
+    }
+
+    public static void hookInstrumentation() {
+        try {
+            Class<?> actThreadCls = Class.forName("android.app.ActivityThread");
+            //反射获取ActivityThread的成员变量sCurrentActivityThread
+            Field actThreadClsField = actThreadCls.getDeclaredField("sCurrentActivityThread");
+            actThreadClsField.setAccessible(true);
+            //sCurrentActivityThread是静态的，直接传null就可以
+            Object actThreadObj = actThreadClsField.get(null);
+
+            //获取mInstrumentation
+            Field mInstrumentationField = actThreadCls.getDeclaredField("mInstrumentation");
+            mInstrumentationField.setAccessible(true);
+            Instrumentation mInstrumentation = (Instrumentation) mInstrumentationField.get(actThreadObj);
+
+            //用我们自己的代理类替换系统的Instrumentation
+            mInstrumentationField.set(actThreadObj, new InstrumentationProxy(mInstrumentation));
+        } catch (Exception e) {
+            e.printStackTrace();
+            LogUtil.e("hookInstrumentation : " + e.getMessage());
         }
     }
 }

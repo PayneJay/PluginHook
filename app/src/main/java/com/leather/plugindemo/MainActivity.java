@@ -8,6 +8,8 @@ import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.leather.plugindemo.utils.HookUtils;
+
 import java.lang.reflect.Method;
 
 public class MainActivity extends AppCompatActivity {

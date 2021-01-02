@@ -30,8 +30,19 @@ public class MyApplication extends Application {
 
         mResources = LoadUtils.loadResource(this, pluginPath);
 
+        //方案1
         HookUtils.hookAMS();
         HookUtils.hookHandler();
+
+
+        /*
+        方案2
+
+        必须在Activity初始化之前用InstrumentationProxy替换Instrumentation，
+        这样所有的Activity和ActivityThread中的mInstrumentation这个成员变量
+        才会都是InstrumentationProxy这个对象
+         */
+//        HookUtils.hookInstrumentation();
     }
 
     @Override
