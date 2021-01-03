@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.List;
 
 public class HookUtils {
     public static final String TARGET_INTENT = "target_intent";
@@ -135,56 +136,59 @@ public class HookUtils {
                 public boolean handleMessage(@NonNull Message msg) {
                     try {
                         LogUtil.i("msg.what : " + msg.what + ",msg.obj : " + msg.obj);
-                        if (msg.what == 100) {//159是activity跳转
-                            Object transObj = msg.obj;
-//                            Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
-//                            if (!actCallbacksField.isAccessible()) {
-//                                actCallbacksField.setAccessible(true);
-//                            }
-//
-//                            List<Object> clientTransItems = (List<Object>) actCallbacksField.get(transObj);
-//                            Object launchAcItem = null;
-//                            if (null == clientTransItems) {
-//                                return false;
-//                            }
-//
-//                            //遍历事务集合，找到启动Activity的事务对象
-//                            for (Object item : clientTransItems) {
-//                                if (item.getClass().getName().contains("android.app.servertransaction.LaunchActivityItem")) {
-//                                    launchAcItem = item;
-//                                    break;
-//                                }
-//                            }
-//
-//                            LogUtil.i( "launchAcItem : " + launchAcItem.toString());
-//                            if (null == launchAcItem) {
-//                                return false;
-//                            }
+                        Object transObj = msg.obj;
+                        switch (msg.what) {
+                            case 100:
+                                //反射获取
+                                Field intentField = transObj.getClass().getDeclaredField("intent");
+                                intentField.setAccessible(true);
+                                //这个intent就是我们前面hook替换的我们自己的代理intent
+                                Intent proxyIntent = (Intent) intentField.get(transObj);
+                                if (proxyIntent != null) {
+                                    LogUtil.i("hookHandler proxyIntent : " + proxyIntent.getComponent().getClassName());
+                                    Intent targetIntent = proxyIntent.getParcelableExtra(TARGET_INTENT);
+                                    if (targetIntent != null && targetIntent.getComponent() != null) {
+                                        //判断下是否是我们之前hook的代理Activity
+                                        String className = targetIntent.getComponent().getClassName();
+                                        LogUtil.i("hookHandler targetIntent : " + className);
+                                        if (className.contains("com.leather.plugin.")) {
+                                            intentField.set(transObj, targetIntent);
 
-                            //反射获取
-                            Field intentField = transObj.getClass().getDeclaredField("intent");
-                            intentField.setAccessible(true);
-                            //这个intent就是我们前面hook替换的我们自己的代理intent
-                            Intent proxyIntent = (Intent) intentField.get(transObj);
-                            if (proxyIntent != null) {
-                                LogUtil.i("hookHandler proxyIntent : " + proxyIntent.getComponent().getClassName());
-                                Intent targetIntent = proxyIntent.getParcelableExtra(TARGET_INTENT);
-                                if (targetIntent != null && targetIntent.getComponent() != null) {
-                                    //判断下是否是我们之前hook的代理Activity
-                                    String className = targetIntent.getComponent().getClassName();
-                                    LogUtil.i("hookHandler targetIntent : " + className);
-                                    if (className.contains("com.leather.plugin.")) {
-                                        intentField.set(transObj, targetIntent);
-
-                                        //通过以下将宿主的上下文传给插件，否则插件无法加载资源布局
-                                        Class<?> aClass = Class.forName(className);
-                                        Object obj = aClass.newInstance();
-                                        if (obj instanceof PluginInterface) {
-                                            ((PluginInterface) obj).attachContext((Activity) obj);
+                                            //通过以下将宿主的上下文传给插件，否则插件无法加载资源布局
+                                            Class<?> aClass = Class.forName(className);
+                                            Object obj = aClass.newInstance();
+                                            if (obj instanceof PluginInterface) {
+                                                ((PluginInterface) obj).attachContext((Activity) obj);
+                                            }
                                         }
                                     }
                                 }
-                            }
+                                break;
+                            case 159:
+                                Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
+                                if (!actCallbacksField.isAccessible()) {
+                                    actCallbacksField.setAccessible(true);
+                                }
+
+                                List<Object> clientTransItems = (List<Object>) actCallbacksField.get(transObj);
+                                Object launchAcItem = null;
+                                if (null == clientTransItems) {
+                                    return false;
+                                }
+
+                                //遍历事务集合，找到启动Activity的事务对象
+                                for (Object item : clientTransItems) {
+                                    if (item.getClass().getName().contains("android.app.servertransaction.LaunchActivityItem")) {
+                                        launchAcItem = item;
+                                        break;
+                                    }
+                                }
+
+                                LogUtil.i("launchAcItem : " + launchAcItem.toString());
+                                if (null == launchAcItem) {
+                                    return false;
+                                }
+                                break;
                         }
                     } catch (Exception e) {
                         e.printStackTrace();

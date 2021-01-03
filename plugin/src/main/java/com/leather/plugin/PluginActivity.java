@@ -3,7 +3,7 @@ package com.leather.plugin;
 import android.os.Bundle;
 import android.util.Log;
 
-public class PluginActivity extends BasicActivity {
+public class PluginActivity extends BaseActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

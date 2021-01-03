@@ -3,6 +3,7 @@ package com.leather.plugin;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -12,6 +13,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.leather.pluginmgr.inter.PluginInterface;
@@ -24,13 +26,14 @@ public class BasicActivity extends AppCompatActivity implements PluginInterface 
      * 注入自己的上下文
      * 如果为空 使用父类
      *
-     * @param layoutResID
+     * @param layoutResID 布局资源id
      */
     @Override
     public void setContentView(int layoutResID) {
         if (thatActivity == null) {
             super.setContentView(layoutResID);
         } else {
+
             thatActivity.setContentView(layoutResID);
         }
     }
@@ -49,10 +52,12 @@ public class BasicActivity extends AppCompatActivity implements PluginInterface 
         if (thatActivity == null) {
             super.setContentView(view, params);
         } else {
+            Log.d(TAG, getClass().getName() + " : thatActivity.setContentView");
             thatActivity.setContentView(view, params);
         }
     }
 
+    @NonNull
     @Override
     public LayoutInflater getLayoutInflater() {
         if (thatActivity == null) {
@@ -92,6 +97,14 @@ public class BasicActivity extends AppCompatActivity implements PluginInterface 
     }
 
     @Override
+    public Resources getResources() {
+        if (getApplication() != null && getApplication().getResources() != null) {
+            return getApplication().getResources();
+        }
+        return super.getResources();
+    }
+
+    @Override
     public WindowManager getWindowManager() {
         if (thatActivity == null) {
             return super.getWindowManager();
@@ -113,6 +126,17 @@ public class BasicActivity extends AppCompatActivity implements PluginInterface 
     @Override
     public void attachContext(Activity context) {
         thatActivity = context;
+        if (thatActivity == null) {
+            Log.d(TAG, "attachContext : thatActivity is " + thatActivity);
+            return;
+        }
+
+        if (thatActivity.getComponentName() == null) {
+            Log.d(TAG, "attachContext : thatActivity.getComponentName() is " + thatActivity.getComponentName());
+            return;
+        }
+
+        Log.d(TAG, "attachContext : " + thatActivity.getComponentName().getClassName());
     }
 
     public void onCreate(Bundle savedInstanceState) {
