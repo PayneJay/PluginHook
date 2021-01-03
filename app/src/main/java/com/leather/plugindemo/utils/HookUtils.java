@@ -153,13 +153,6 @@ public class HookUtils {
                                         LogUtil.i("hookHandler targetIntent : " + className);
                                         if (className.contains("com.leather.plugin.")) {
                                             intentField.set(transObj, targetIntent);
-
-                                            //通过以下将宿主的上下文传给插件，否则插件无法加载资源布局
-                                            Class<?> aClass = Class.forName(className);
-                                            Object obj = aClass.newInstance();
-                                            if (obj instanceof PluginInterface) {
-                                                ((PluginInterface) obj).attachContext((Activity) obj);
-                                            }
                                         }
                                     }
                                 }

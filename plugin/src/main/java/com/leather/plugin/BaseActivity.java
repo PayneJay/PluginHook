@@ -27,7 +27,7 @@ public class BaseActivity extends AppCompatActivity {
      * 替换系统的mResources
      */
     private void replaceSystemResources() {
-        Resources resources = LoadResourceUtils.loadResource(getApplication(),
+        Resources resources = LoadResourceUtils.getPluginResources(this,
                 Environment.getExternalStorageDirectory().getPath() + "/plugin-debug.apk");
 
         Log.e("Jack", getClass().getName() + " onCreate");

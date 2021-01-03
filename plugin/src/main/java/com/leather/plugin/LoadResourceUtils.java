@@ -8,6 +8,15 @@ import android.util.Log;
 import java.lang.reflect.Method;
 
 public class LoadResourceUtils {
+    private static Resources pluginResources;
+
+    public static Resources getPluginResources(Context context, String path) {
+        if (pluginResources == null) {
+            pluginResources = loadResource(context, path);
+        }
+        return pluginResources;
+    }
+
     /**
      * 加载资源
      * 通过反射调用AssetManager的addAssetPath方法，去加载指定路径下的资源
@@ -15,7 +24,7 @@ public class LoadResourceUtils {
      * @param path 资源路径
      * @return 返回我们自己的Resources，用来加载插件中的资源
      */
-    public static Resources loadResource(Context context, String path) {
+    private static Resources loadResource(Context context, String path) {
         Resources pluginResources = null;
         try {
             AssetManager assetManager = AssetManager.class.newInstance();

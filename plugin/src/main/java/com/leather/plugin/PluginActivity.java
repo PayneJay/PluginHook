@@ -12,4 +12,40 @@ public class PluginActivity extends BaseActivity {
 
         Log.e("Jack", getClass().getName() + " onCreate");
     }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Log.e("Jack", getClass().getName() + " onStart");
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        Log.e("Jack", getClass().getName() + " onRestart");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.e("Jack", getClass().getName() + " onResume");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.e("Jack", getClass().getName() + " onPause");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.e("Jack", getClass().getName() + " onStop");
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.e("Jack", getClass().getName() + " onDestroy");
+    }
 }
