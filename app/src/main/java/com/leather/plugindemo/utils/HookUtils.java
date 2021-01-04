@@ -1,6 +1,5 @@
 package com.leather.plugindemo.utils;
 
-import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -14,7 +13,7 @@ import androidx.annotation.NonNull;
 
 import com.leather.plugindemo.InstrumentationProxy;
 import com.leather.plugindemo.ProxyActivity;
-import com.leather.pluginmgr.inter.PluginInterface;
+import com.leather.plugindemo.ProxyHandlerCallback;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -30,13 +29,20 @@ public class HookUtils {
         try {
             Field enterField;
             LogUtil.i("Build.VERSION.SDK_INT : " + Build.VERSION.SDK_INT);
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {//API 26以后走这个方法
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+                //API 27,即Android7之前的版本走这个方法
+                Class<?> activityManagerNative = Class.forName("android.app.ActivityManagerNative");
+                enterField = activityManagerNative.getDeclaredField("gDefault");
+            } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                //API 26到28走这个方法，也就是Android7、8、9
                 Class<?> activityManagerClass = Class.forName("android.app.ActivityManager");
                 //Field IActivityManagerSingleton
                 enterField = activityManagerClass.getDeclaredField("IActivityManagerSingleton");
-            } else {//以前老版本走这个方法
-                Class<?> activityManagerNative = Class.forName("android.app.ActivityManagerNative");
-                enterField = activityManagerNative.getDeclaredField("gDefault");
+            } else {
+                //API 29,Android10及以后源码走这个方法
+                Class<?> activityManagerClass = Class.forName("android.app.ActivityTaskManager");
+                //Field IActivityManagerSingleton
+                enterField = activityManagerClass.getDeclaredField("IActivityTaskManagerSingleton");
             }
 
             enterField.setAccessible(true);
@@ -46,12 +52,24 @@ public class HookUtils {
             Class<?> singletonClass = Class.forName("android.util.Singleton");
             Field mInstanceField = singletonClass.getDeclaredField("mInstance");
             mInstanceField.setAccessible(true);
+            Method methodGet = singletonClass.getDeclaredMethod("get");
+            methodGet.setAccessible(true);
             // 获取singletonObject中变量mInstance的值即IActivityManager类型的实例
-            final Object mIActivityManagerObject = mInstanceField.get(singletonObject);
+            final Object mIActivityManagerObject = methodGet.invoke(singletonObject);
+
+            // 防止多次重复hook，在"基于《Android插件化开发指南》第4章对于ActivityManager hook的思考"一文已介绍
+            if (Proxy.isProxyClass(mIActivityManagerObject.getClass())) {
+                return;
+            }
 
             //IActivityManager 是接口，通过动态代理来处理
             ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-            Class<?> iActivityManagerInterface = Class.forName("android.app.IActivityManager");
+            Class<?> iActivityManagerInterface;
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                iActivityManagerInterface = Class.forName("android.app.IActivityManager");
+            } else {//Android10及以后
+                iActivityManagerInterface = Class.forName("android.app.IActivityTaskManager");
+            }
 
             //生产IActivityManager的代理对象
             Object mIActivityManagerProxy = Proxy.newProxyInstance(
@@ -61,6 +79,7 @@ public class HookUtils {
                         public Object invoke(Object proxy, Method method, Object[] objects) throws Throwable {
                             //这个invoke方法会多次回调，因为IActivityTaskManager接口中不止有一个方法
                             //我们需要判断找到我们要hook的方法做处理，其他方法照常走以前的逻辑
+                            LogUtil.i("hookAMS InvocationHandler : " + method);
                             if (TextUtils.equals("startActivity", method.getName())) {
                                 Intent targetIntent = null;
                                 int index = 0;
@@ -131,65 +150,7 @@ public class HookUtils {
                 mCallbackField.setAccessible(true);
             }
             //hook替换系统的Handler.Callback为我们自定义的Handler.Callback
-            mCallbackField.set(mHObj, new Handler.Callback() {
-                @Override
-                public boolean handleMessage(@NonNull Message msg) {
-                    try {
-                        LogUtil.i("msg.what : " + msg.what + ",msg.obj : " + msg.obj);
-                        Object transObj = msg.obj;
-                        switch (msg.what) {
-                            case 100:
-                                //反射获取
-                                Field intentField = transObj.getClass().getDeclaredField("intent");
-                                intentField.setAccessible(true);
-                                //这个intent就是我们前面hook替换的我们自己的代理intent
-                                Intent proxyIntent = (Intent) intentField.get(transObj);
-                                if (proxyIntent != null) {
-                                    LogUtil.i("hookHandler proxyIntent : " + proxyIntent.getComponent().getClassName());
-                                    Intent targetIntent = proxyIntent.getParcelableExtra(TARGET_INTENT);
-                                    if (targetIntent != null && targetIntent.getComponent() != null) {
-                                        //判断下是否是我们之前hook的代理Activity
-                                        String className = targetIntent.getComponent().getClassName();
-                                        LogUtil.i("hookHandler targetIntent : " + className);
-                                        if (className.contains("com.leather.plugin.")) {
-                                            intentField.set(transObj, targetIntent);
-                                        }
-                                    }
-                                }
-                                break;
-                            case 159:
-                                Field actCallbacksField = transObj.getClass().getDeclaredField("mActivityCallbacks");
-                                if (!actCallbacksField.isAccessible()) {
-                                    actCallbacksField.setAccessible(true);
-                                }
-
-                                List<Object> clientTransItems = (List<Object>) actCallbacksField.get(transObj);
-                                Object launchAcItem = null;
-                                if (null == clientTransItems) {
-                                    return false;
-                                }
-
-                                //遍历事务集合，找到启动Activity的事务对象
-                                for (Object item : clientTransItems) {
-                                    if (item.getClass().getName().contains("android.app.servertransaction.LaunchActivityItem")) {
-                                        launchAcItem = item;
-                                        break;
-                                    }
-                                }
-
-                                LogUtil.i("launchAcItem : " + launchAcItem.toString());
-                                if (null == launchAcItem) {
-                                    return false;
-                                }
-                                break;
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        LogUtil.i("handleMessage : " + e.getMessage());
-                    }
-                    return false;
-                }
-            });
+            mCallbackField.set(mHObj, new ProxyHandlerCallback());
 
         } catch (Exception e) {
             e.printStackTrace();
